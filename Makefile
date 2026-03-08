@@ -1,9 +1,6 @@
 # Docker
-docker-up:
-	docker compose up --build -d
+run:
+	docker compose up -d
 
-docker-down:
+stop:
 	docker compose down
-
-docker-logs:
-	docker compose logs -f
