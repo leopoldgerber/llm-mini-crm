@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from llm_mini_crm.agent.schemas import (
     AgentDbResult, AgentSqlPlan, build_db_result)
@@ -48,6 +49,19 @@ def parse_result_rows(result_data: Any) -> list[dict[str, Any]]:
         return []
 
 
+def parse_integrity_error(error: IntegrityError) -> str:
+    """Parse integrity error into readable message.
+    Args:
+        error (IntegrityError): Database integrity error."""
+    error_text = str(error).lower()
+
+    if ('clients_email_key' in error_text
+            or 'duplicate key value' in error_text):
+        return 'Client with this email already exists.'
+
+    return 'Database integrity error.'
+
+
 async def execute_select(
         sql: str,
         params: dict[str, Any]
@@ -73,10 +87,15 @@ async def execute_change(sql: str, params: dict[str, Any]) -> int:
     engine = get_async_engine()
     safe_params = normalize_params(params=params)
 
-    async with engine.begin() as connection:
-        result_data = await connection.execute(text(sql), safe_params)
-        affected_count = result_data.rowcount if result_data is not None else 0
-        return int(affected_count) if affected_count is not None else 0
+    try:
+        async with engine.begin() as connection:
+            result_data = await connection.execute(text(sql), safe_params)
+            affected_count = (
+                result_data.rowcount if result_data is not None else 0)
+            return int(affected_count) if affected_count is not None else 0
+    except IntegrityError as error:
+        error_message = parse_integrity_error(error=error)
+        raise ValueError(error_message) from error
 
 
 async def execute_sql_plan(sql_plan: AgentSqlPlan) -> AgentDbResult:
@@ -89,10 +108,7 @@ async def execute_sql_plan(sql_plan: AgentSqlPlan) -> AgentDbResult:
 
     operation = str(sql_plan.operation).strip().lower()
     if operation == 'select':
-        rows = await execute_select(
-            sql=sql_plan.sql,
-            params=sql_plan.params
-        )
+        rows = await execute_select(sql=sql_plan.sql, params=sql_plan.params)
         return build_db_result(rows)
 
     if operation in ('insert', 'delete'):

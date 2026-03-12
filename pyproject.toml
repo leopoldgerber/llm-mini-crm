@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "llm-mini-crm"
 version = "0.1.0"
-description = "LLM Agent with mini CRM (API + agent + db utilities)"
+description = "LLM agent demo for mini CRM workflows with database utilities"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -15,12 +15,6 @@ dependencies = [
   "python-dotenv>=1.0",
   "loguru>=0.7",
   "numpy>=1.24",
-
-  # API
-  "fastapi>=0.110",
-  "uvicorn[standard]>=0.27",
-
-  # HTTP client
   "httpx>=0.27"
 ]
 
@@ -32,4 +26,4 @@ where = ["src"]
 include = ["llm_mini_crm*"]
 
 [tool.setuptools.package-data]
-hr_vacancy_analytics = ["db/queries/*.sql"]
+llm_mini_crm = ["db/queries/*.sql"]

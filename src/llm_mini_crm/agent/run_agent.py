@@ -1,6 +1,5 @@
 import asyncio
 import json
-# import sys
 
 from llm_mini_crm.agent.config import load_agent_config
 from llm_mini_crm.agent.llm_client import LlmClient, load_llm_config
@@ -25,40 +24,55 @@ async def run_agent_once(user_text: str) -> None:
     """Run agent one time, execute SQL plan, print result.
     Args:
         user_text (str): Raw user input."""
-    agent_config = load_agent_config()
-    llm_config = load_llm_config(
-        timeout_seconds=agent_config.llm_timeout_seconds)
-    llm_client = LlmClient(llm_config)
+    try:
+        agent_config = load_agent_config()
+        llm_config = load_llm_config(
+            timeout_seconds=agent_config.llm_timeout_seconds)
+        llm_client = LlmClient(llm_config)
 
-    sql_agent_config = build_sql_agent_config()
-    sql_agent = SqlAgent(
-        agent_config=agent_config,
-        llm_client=llm_client,
-        sql_agent_config=sql_agent_config
-    )
+        sql_agent_config = build_sql_agent_config()
+        sql_agent = SqlAgent(
+            agent_config=agent_config,
+            llm_client=llm_client,
+            sql_agent_config=sql_agent_config,
+        )
 
-    agent_request = build_agent_request(user_text)
-    sql_plan = await sql_agent.build_sql_plan(agent_request)
+        agent_request = build_agent_request(user_text)
+        sql_plan = await sql_agent.build_sql_plan(agent_request)
+        db_result = await execute_sql_plan(sql_plan)
 
-    db_result = await execute_sql_plan(sql_plan)
-
-    output_data = {
-        'request': user_text,
-        'plan': {
-            'operation': sql_plan.operation,
-            'sql': sql_plan.sql,
-            'params': sql_plan.params,
-        },
-        'result': db_result.rows,
-    }
-    print(json.dumps(output_data, ensure_ascii=False, indent=2))
+        output_data = {
+            'status': 'success',
+            'request': user_text,
+            'plan': {
+                'operation': sql_plan.operation,
+                'sql': sql_plan.sql,
+                'params': sql_plan.params,
+            },
+            'result': db_result.rows,
+        }
+        print(json.dumps(output_data, ensure_ascii=False, indent=2))
+    except ValueError as error:
+        error_data = {
+            'status': 'error',
+            'request': user_text,
+            'message': str(error),
+        }
+        print(json.dumps(error_data, ensure_ascii=False, indent=2))
+    except Exception as error:
+        error_data = {
+            'status': 'error',
+            'request': user_text,
+            'message': 'Unexpected application error.',
+            'details': str(error),
+        }
+        print(json.dumps(error_data, ensure_ascii=False, indent=2))
 
 
 def main(input_text: list[str]) -> None:
     """Run CLI entrypoint.
     Args:
-        _ (None): No arguments required."""
-    # user_text = read_user_text(sys.argv)
+        input_text (list[str]): Input arguments list."""
     user_text = read_user_text(input_text)
     if not user_text:
         print('Empty request.')
@@ -68,6 +82,11 @@ def main(input_text: list[str]) -> None:
 
 
 if __name__ == '__main__':
-    text = "Add client John Smith with email john.smith@example.co.uk"
-    argv = ["script.py"] + text.split()
-    main(argv)
+    import sys
+
+    main(sys.argv)
+
+    # # Use from root
+    # text = "Add client John Smith with email john.smith@example.co.uk"
+    # argv = ["script.py"] + text.split()
+    # main(argv)
