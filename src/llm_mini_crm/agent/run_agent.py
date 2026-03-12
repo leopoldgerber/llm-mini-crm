@@ -1,5 +1,7 @@
-import asyncio
+import sys
 import json
+import asyncio
+from datetime import date, datetime, time
 
 from llm_mini_crm.agent.config import load_agent_config
 from llm_mini_crm.agent.llm_client import LlmClient, load_llm_config
@@ -20,6 +22,38 @@ def read_user_text(argv: list[str]) -> str:
     return user_text
 
 
+def normalize_value(data: object) -> object:
+    """Normalize value for JSON serialization.
+    Args:
+        data (object): Input value to normalize."""
+    if isinstance(data, dict):
+        return {key: normalize_value(value) for key, value in data.items()}
+
+    if isinstance(data, list):
+        return [normalize_value(item) for item in data]
+
+    if isinstance(data, (datetime, date, time)):
+        return data.isoformat()
+
+    return data
+
+
+def normalize_rows(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Normalize database rows for JSON serialization.
+    Args:
+        rows (list[dict[str, object]]): Database result rows."""
+    normalized_rows = []
+
+    for row in rows:
+        normalized_row = {
+            key: normalize_value(value)
+            for key, value in row.items()
+        }
+        normalized_rows.append(normalized_row)
+
+    return normalized_rows
+
+
 async def run_agent_once(user_text: str) -> None:
     """Run agent one time, execute SQL plan, print result.
     Args:
@@ -27,7 +61,8 @@ async def run_agent_once(user_text: str) -> None:
     try:
         agent_config = load_agent_config()
         llm_config = load_llm_config(
-            timeout_seconds=agent_config.llm_timeout_seconds)
+            timeout_seconds=agent_config.llm_timeout_seconds,
+        )
         llm_client = LlmClient(llm_config)
 
         sql_agent_config = build_sql_agent_config()
@@ -40,6 +75,7 @@ async def run_agent_once(user_text: str) -> None:
         agent_request = build_agent_request(user_text)
         sql_plan = await sql_agent.build_sql_plan(agent_request)
         db_result = await execute_sql_plan(sql_plan)
+        result_rows = normalize_rows(db_result.rows)
 
         output_data = {
             'status': 'success',
@@ -49,7 +85,7 @@ async def run_agent_once(user_text: str) -> None:
                 'sql': sql_plan.sql,
                 'params': sql_plan.params,
             },
-            'result': db_result.rows,
+            'result': result_rows,
         }
         print(json.dumps(output_data, ensure_ascii=False, indent=2))
     except ValueError as error:
@@ -82,8 +118,6 @@ def main(input_text: list[str]) -> None:
 
 
 if __name__ == '__main__':
-    import sys
-
     main(sys.argv)
 
     # # Use from root
