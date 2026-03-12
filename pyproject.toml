@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "llm-mini-crm"
 version = "0.1.0"
-description = "LLM agent demo for mini CRM workflows with database utilities"
+description = "Lightweight demo of an LLM-powered SQL agent for a mini CRM dataset"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
